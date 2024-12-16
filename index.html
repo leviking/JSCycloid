@@ -22,8 +22,8 @@
   }
   #gearSVG {
     border: 1px solid #ccc;
-    width: 500px;
-    height: 500px;
+    width: 640px;
+    height: 640px;
     display: block;
     margin-top: 20px;
   }
@@ -72,13 +72,28 @@ function generateGear() {
   let epicycloid_points = [];
   for (let angle = 0; angle <= 360; angle++) {
     const rad = deg2rad(angle);
-    const xCenter = (cycloidBaseRadius + rollingCircleRadius)*Math.cos(rad);
-    const yCenter = (cycloidBaseRadius + rollingCircleRadius)*Math.sin(rad);
+    
+    // Compute the center of the rolling circle
+    const xCenter = (cycloidBaseRadius + rollingCircleRadius) * Math.cos(rad);
+    const yCenter = (cycloidBaseRadius + rollingCircleRadius) * Math.sin(rad);
 
-    const xPoint = xCenter + (rollingCircleRadius - contraction)*Math.cos(deg2rad(numberOfPins*angle));
-    const yPoint = yCenter + (rollingCircleRadius - contraction)*Math.sin(deg2rad(numberOfPins*angle));
+    // Compute the parametric epicycloid point (before pinRadius adjustment)
+    const X = xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * angle));
+    const Y = yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * angle));
 
-    epicycloid_points.push({x: xPoint, y: yPoint});
+    // Compute the radial distance of this point from the global center (0,0)
+    const dist = Math.sqrt(X * X + Y * Y);
+
+    // Adjust the distance by pinRadius (move points inward)
+    const newDist = Math.max(dist - pinRadius, 0);
+    const scale = newDist / dist;
+
+    // If dist is 0 (extremely unlikely), handle gracefully
+    const X_new = (dist === 0) ? X : X * scale;
+    const Y_new = (dist === 0) ? Y : Y * scale;
+
+    // Store the adjusted point
+    epicycloid_points.push({ x: X_new, y: Y_new });
   }
 	console.log(epicycloid_points)
 
@@ -93,7 +108,7 @@ function generateGear() {
 
   // Update reference circles (visual only)
   document.getElementById('cycloidBaseCircle').setAttribute('r', cycloidBaseRadius);
-  document.getElementById('rollingCircle').setAttribute('r', rollingCircleRadius);
+  //document.getElementById('rollingCircle').setAttribute('r', rollingCircleRadius);
 
   // Draw pin circles (visual only)
   const pinsGroup = document.getElementById('pinsGroup');

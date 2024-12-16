@@ -8,13 +8,14 @@
 <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-<h1>Cycloidal Gear Generator<a href="about.html">[?]</a></h1>
-<a href="invert.html"><small>[Inverted here]</small></a>
+<h1>Cycloidal Gear Generator</a></h1>
+<a href="about.html"><small>[about]</small></a>
 <div class="controls">
   <div><label>Number of Pins: <input type="number" id="numPins" value="10"></label></div>
   <div><label>Pin Radius (mm): <input type="number" id="pinRadius" value="2.5" step="0.1"></label></div>
   <div><label>Pin Circle Radius (mm): <input type="number" id="pinCircleRadius" value="50" step="0.1"></label></div>
   <div><label>Contraction (mm): <input type="number" id="contraction" value="2" step="0.1"></label></div>
+  <div><label>Inverted: <input type="checkbox" id="inverted"></label></div>
   <div><button id="generateBtn">Generate Gear</button></div>
   <div><button id="downloadBtn">Download SVG (Just Profile)</button></div>
 </div>
@@ -42,7 +43,7 @@ function deg2rad(deg) {
  * @param {number} numberOfPins
  * @returns {object} {X, Y} coordinates of the epicycloid point
  */
-function computeEpicycloidPoint(angleDeg, cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins) {
+function computeEpicycloidPoint(angleDeg, cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins, inverted) {
   const rad = deg2rad(angleDeg);
 
   // The rolling circle's center position
@@ -50,8 +51,13 @@ function computeEpicycloidPoint(angleDeg, cycloidBaseRadius, rollingCircleRadius
   const yCenter = (cycloidBaseRadius + rollingCircleRadius) * Math.sin(rad);
 
   // The tracing point of the epicycloid (without offset)
-  const X = xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * angleDeg));
-  const Y = yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * angleDeg));
+
+  const X = inverted ? 
+    xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * -angleDeg))
+    : xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * angleDeg));
+  const Y = inverted ? 
+    yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * -angleDeg))
+    : yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * angleDeg));
   return { X, Y };
 }
 
@@ -67,7 +73,7 @@ function computeEpicycloidPoint(angleDeg, cycloidBaseRadius, rollingCircleRadius
  * @param {number} pinRadius
  * @returns {Array} Array of {x, y} points representing the inset epicycloid
  */
-function computeOffsetCurve(cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins, pinRadius) {
+function computeOffsetCurve(cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins, pinRadius, inverted) {
   const epicycloid_points = [];
   
   // Step sizes for numerical derivative approximation
@@ -76,7 +82,7 @@ function computeOffsetCurve(cycloidBaseRadius, rollingCircleRadius, contraction,
 
   // Helper function to get a point at angleDeg
   function getPoint(angleDeg) {
-    return computeEpicycloidPoint(angleDeg, cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins);
+    return computeEpicycloidPoint(angleDeg, cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins, inverted);
   }
 
   // Sweep through 360 degrees to get the full curve
@@ -111,8 +117,12 @@ function computeOffsetCurve(cycloidBaseRadius, rollingCircleRadius, contraction,
     }
 
     // Move the point inward by pinRadius along the normal
-    const X_inset = current.X + pinRadius * Nx;
-    const Y_inset = current.Y + pinRadius * Ny;
+    const X_inset = inverted ? 
+      current.X - pinRadius * Nx 
+      : current.X + pinRadius * Nx;
+    const Y_inset = inverted ?
+      current.Y - pinRadius * Nx
+      : current.Y + pinRadius * Ny;
 
     epicycloid_points.push({ x: X_inset, y: Y_inset });
   }
@@ -156,14 +166,17 @@ function generateGear() {
   const pinRadius = parseFloat(document.getElementById('pinRadius').value);
   const pinCircleRadius = parseFloat(document.getElementById('pinCircleRadius').value);
   const contraction = parseFloat(document.getElementById('contraction').value);
+  const inverted = document.getElementById('inverted').checked;
 
   // Derived values
   const rollingCircleRadius = pinCircleRadius / numberOfPins;
-  const reductionRatio = numberOfPins - 1;
+  const reductionRatio = inverted ? 
+    numberOfPins +1 
+    : numberOfPins - 1;
   const cycloidBaseRadius = reductionRatio * rollingCircleRadius;
 
   // Compute offset epicycloid curve
-  const epicycloid_points = computeOffsetCurve(cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins, pinRadius);
+  const epicycloid_points = computeOffsetCurve(cycloidBaseRadius, rollingCircleRadius, contraction, numberOfPins, pinRadius, inverted);
 
   // Convert points to path data
   let pathData = `M ${epicycloid_points[0].x},${epicycloid_points[0].y}`;

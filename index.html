@@ -1,47 +1,21 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Cycloidal Gear Generator</title>
-<style>
-  body {
-    font-family: sans-serif;
-    margin: 20px;
-  }
-  .controls {
-    margin-bottom: 20px;
-  }
-  label {
-    margin-right: 10px;
-  }
-  input {
-    width: 60px;
-    margin-right: 20px;
-  }
-  #gearSVG {
-    border: 1px solid #ccc;
-    width: 640px;
-    height: 640px;
-    display: block;
-    margin-top: 20px;
-  }
-  button {
-    margin-right: 10px;
-    padding: 6px 12px;
-  }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1>Cycloidal Gear Generator</h1>
+<h1>Cycloidal Gear Generator<a href="about.html">[?]</a></h1>
+<a href="invert.html"><small>[Inverted here]</small></a>
 <div class="controls">
-  <label>Number of Pins: <input type="number" id="numPins" value="10"></label>
-  <label>Pin Radius (mm): <input type="number" id="pinRadius" value="2.5" step="0.1"></label>
-  <label>Pin Circle Radius (mm): <input type="number" id="pinCircleRadius" value="50" step="0.1"></label>
-  <label>Contraction (mm): <input type="number" id="contraction" value="2" step="0.1"></label>
-  <button id="generateBtn">Generate Gear</button>
-  <button id="downloadBtn">Download SVG (Just Profile)</button>
+  <div><label>Number of Pins: <input type="number" id="numPins" value="10"></label></div>
+  <div><label>Pin Radius (mm): <input type="number" id="pinRadius" value="2.5" step="0.1"></label></div>
+  <div><label>Pin Circle Radius (mm): <input type="number" id="pinCircleRadius" value="50" step="0.1"></label></div>
+  <div><label>Contraction (mm): <input type="number" id="contraction" value="2" step="0.1"></label></div>
+  <div><button id="generateBtn">Generate Gear</button></div>
+  <div><button id="downloadBtn">Download SVG (Just Profile)</button></div>
 </div>
 
 <svg id="gearSVG" xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120">

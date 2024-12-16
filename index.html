@@ -69,33 +69,64 @@ function generateGear() {
   const cycloidBaseRadius = reductionRatio * rollingCircleRadius;
 
   // Compute epicycloid points
-  let epicycloid_points = [];
-  for (let angle = 0; angle <= 360; angle++) {
-    const rad = deg2rad(angle);
-    
-    // Compute the center of the rolling circle
+  const epicycloid_points = [];
+  
+  // A small step for numerical derivative approximation
+  const stepDeg = 0.01; // smaller step for smoother derivative, you can adjust as needed
+  const stepRad = deg2rad(stepDeg);
+
+  function computePoint(angleDeg) {
+    const rad = deg2rad(angleDeg);
     const xCenter = (cycloidBaseRadius + rollingCircleRadius) * Math.cos(rad);
     const yCenter = (cycloidBaseRadius + rollingCircleRadius) * Math.sin(rad);
 
-    // Compute the parametric epicycloid point (before pinRadius adjustment)
-    const X = xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * angle));
-    const Y = yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * angle));
-
-    // Compute the radial distance of this point from the global center (0,0)
-    const dist = Math.sqrt(X * X + Y * Y);
-
-    // Adjust the distance by pinRadius (move points inward)
-    const newDist = Math.max(dist - pinRadius, 0);
-    const scale = newDist / dist;
-
-    // If dist is 0 (extremely unlikely), handle gracefully
-    const X_new = (dist === 0) ? X : X * scale;
-    const Y_new = (dist === 0) ? Y : Y * scale;
-
-    // Store the adjusted point
-    epicycloid_points.push({ x: X_new, y: Y_new });
+    const X = xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * angleDeg));
+    const Y = yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * angleDeg));
+    return { X, Y };
   }
-	console.log(epicycloid_points)
+
+  for (let angle = 0; angle <= 360; angle += stepDeg) {
+    // Current point
+    const p = computePoint(angle);
+
+    // Points to approximate derivative
+    const pForward = computePoint(angle + stepDeg);
+    const pBackward = computePoint(angle - stepDeg);
+
+    // Approximate derivatives dX/dθ and dY/dθ
+    // Note: derivative w.r.t. θ in radians, so convert angle steps to radians
+    const dX = (pForward.X - pBackward.X) / (2 * stepRad);
+    const dY = (pForward.Y - pBackward.Y) / (2 * stepRad);
+
+    // Tangent vector T = (dX, dY)
+    // A normal vector can be found by rotating T by 90 degrees.
+    // For a given vector (dx, dy), two perpendicular vectors are (-dy, dx) or (dy, -dx).
+    let Nx = -dY;
+    let Ny = dX;
+
+    // Determine whether this normal points inward:
+    // The inside of the epicycloid is toward (0,0).
+    // If the dot product of (X,Y) and (Nx,Ny) is positive, the normal points outward.
+    const dot = p.X * Nx + p.Y * Ny;
+    if (dot > 0) {
+      // Flip the normal to point inward
+      Nx = -Nx;
+      Ny = -Ny;
+    }
+
+    // Normalize the normal vector
+    const len = Math.sqrt(Nx * Nx + Ny * Ny);
+    if (len !== 0) {
+      Nx /= len;
+      Ny /= len;
+    }
+
+    // Offset the point inward by pinRadius along the inward normal
+    const X_inset = p.X + pinRadius * Nx;
+    const Y_inset = p.Y + pinRadius * Ny;
+
+    epicycloid_points.push({ x: X_inset, y: Y_inset });
+  }
 
   // Create the path for the epicycloid
   let d = `M ${epicycloid_points[0].x},${epicycloid_points[0].y}`;

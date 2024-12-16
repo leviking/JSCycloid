@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Cycloidal Gear Generator</title>
+<style>
+  body {
+    font-family: sans-serif;
+    margin: 20px;
+  }
+  .controls {
+    margin-bottom: 20px;
+  }
+  label {
+    margin-right: 10px;
+  }
+  input {
+    width: 60px;
+    margin-right: 20px;
+  }
+  #gearSVG {
+    border: 1px solid #ccc;
+    width: 640px;
+    height: 640px;
+    display: block;
+    margin-top: 20px;
+  }
+  button {
+    margin-right: 10px;
+    padding: 6px 12px;
+  }
+</style>
+</head>
+<body>
+<h1>Invert Cycloidal Gear Generator</h1>
+<div class="controls">
+  <label>Number of Pins: <input type="number" id="numPins" value="10"></label>
+  <label>Pin Radius (mm): <input type="number" id="pinRadius" value="2.5" step="0.1"></label>
+  <label>Pin Circle Radius (mm): <input type="number" id="pinCircleRadius" value="50" step="0.1"></label>
+  <label>Contraction (mm): <input type="number" id="contraction" value="2" step="0.1"></label>
+  <button id="generateBtn">Generate Gear</button>
+  <button id="downloadBtn">Download SVG (Just Profile)</button>
+</div>
+
+<svg id="gearSVG" xmlns="http://www.w3.org/2000/svg" viewBox="-60 -60 120 120">
+  <!-- For visualization only -->
+  <circle id="cycloidBaseCircle" cx="0" cy="0" r="0" stroke-dasharray="4" fill="none" stroke="gray"/>
+  <circle id="rollingCircle" cx="0" cy="0" r="0" stroke="black" fill="none"/>
+  <g id="pinsGroup" fill="none" stroke="blue"></g>
+
+  <!-- The main epicycloid path -->
+  <path id="epicycloidPath" stroke="red" fill="none"/>
+</svg>
+
+<script>
+function deg2rad(d) { return d * Math.PI/180; }
+
+function generateGear() {
+  const numberOfPins = parseFloat(document.getElementById('numPins').value);
+  const pinRadius = parseFloat(document.getElementById('pinRadius').value);
+  const pinCircleRadius = parseFloat(document.getElementById('pinCircleRadius').value);
+  const contraction = parseFloat(document.getElementById('contraction').value);
+
+  // Derived values
+  const rollingCircleRadius = pinCircleRadius / numberOfPins;
+  const reductionRatio = numberOfPins + 1;
+  const cycloidBaseRadius = reductionRatio * rollingCircleRadius;
+
+  // Compute epicycloid points
+  const epicycloid_points = [];
+  
+  // A small step for numerical derivative approximation
+  const stepDeg = 0.01; // smaller step for smoother derivative, you can adjust as needed
+  const stepRad = deg2rad(stepDeg);
+
+  function computePoint(angleDeg) {
+    const rad = deg2rad(angleDeg);
+    const xCenter = (cycloidBaseRadius - rollingCircleRadius) * Math.cos(rad);
+    const yCenter = (cycloidBaseRadius - rollingCircleRadius) * Math.sin(rad);
+
+    const X = xCenter + (rollingCircleRadius - contraction) * Math.cos(deg2rad(numberOfPins * -angleDeg));
+    const Y = yCenter + (rollingCircleRadius - contraction) * Math.sin(deg2rad(numberOfPins * -angleDeg));
+    return { X, Y };
+  }
+
+  for (let angle = 0; angle <= 360; angle += stepDeg) {
+    // Current point
+    const p = computePoint(angle);
+
+    // Points to approximate derivative
+    const pForward = computePoint(angle + stepDeg);
+    const pBackward = computePoint(angle - stepDeg);
+
+    // Approximate derivatives dX/dθ and dY/dθ
+    // Note: derivative w.r.t. θ in radians, so convert angle steps to radians
+    const dX = (pForward.X - pBackward.X) / (2 * stepRad);
+    const dY = (pForward.Y - pBackward.Y) / (2 * stepRad);
+
+    // Tangent vector T = (dX, dY)
+    // A normal vector can be found by rotating T by 90 degrees.
+    // For a given vector (dx, dy), two perpendicular vectors are (-dy, dx) or (dy, -dx).
+    let Nx = -dY;
+    let Ny = dX;
+
+    // Determine whether this normal points inward:
+    // The inside of the epicycloid is toward (0,0).
+    // If the dot product of (X,Y) and (Nx,Ny) is positive, the normal points outward.
+    const dot = p.X * Nx + p.Y * Ny;
+    if (dot > 0) {
+      // Flip the normal to point inward
+      Nx = -Nx;
+      Ny = -Ny;
+    }
+
+    // Normalize the normal vector
+    const len = Math.sqrt(Nx * Nx + Ny * Ny);
+    if (len !== 0) {
+      Nx /= len;
+      Ny /= len;
+    }
+
+    // Offset the point inward by pinRadius along the inward normal
+    const X_inset = p.X - pinRadius * Nx;
+    const Y_inset = p.Y - pinRadius * Ny;
+
+    epicycloid_points.push({ x: X_inset, y: Y_inset });
+  }
+
+  // Create the path for the epicycloid
+  let d = `M ${epicycloid_points[0].x},${epicycloid_points[0].y}`;
+  for (let i = 1; i < epicycloid_points.length; i++) {
+    d += ` L ${epicycloid_points[i].x},${epicycloid_points[i].y}`;
+  }
+  d += 'Z';
+
+  document.getElementById('epicycloidPath').setAttribute('d', d);
+
+  // Update reference circles (visual only)
+  document.getElementById('cycloidBaseCircle').setAttribute('r', cycloidBaseRadius);
+  //document.getElementById('rollingCircle').setAttribute('r', rollingCircleRadius);
+
+  // Draw pin circles (visual only)
+  const pinsGroup = document.getElementById('pinsGroup');
+  while (pinsGroup.firstChild) {
+    pinsGroup.removeChild(pinsGroup.firstChild);
+  }
+
+  for (let i = 0; i <= numberOfPins; i++) {
+    const pinAngle = deg2rad((360/numberOfPins)*i);
+    const px = pinCircleRadius * Math.cos(pinAngle) + rollingCircleRadius - contraction;
+    const py = pinCircleRadius * Math.sin(pinAngle);
+    const circle = document.createElementNS("http://www.w3.org/2000/svg", 'circle');
+    circle.setAttribute('cx', px);
+    circle.setAttribute('cy', py);
+    circle.setAttribute('r', pinRadius);
+    pinsGroup.appendChild(circle);
+  }
+
+  // Adjust the viewBox dynamically so everything fits
+  adjustViewBox(epicycloid_points, pinCircleRadius, pinRadius);
+}
+
+function adjustViewBox(points, pinCircleRadius, pinRadius) {
+  // Compute bounding box of all points + pins
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+
+  points.forEach(p => {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  });
+
+  // Add some padding
+  const padding = pinCircleRadius * 1.5;
+  minX -= padding;
+  maxX += padding;
+  minY -= padding;
+  maxY += padding;
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const svg = document.getElementById('gearSVG');
+  svg.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+}
+
+function downloadSVG() {
+  // We want only the epicycloidPath in the exported file
+  const epicycloidPath = document.getElementById('epicycloidPath');
+  const d = epicycloidPath.getAttribute('d');
+
+  // Create a minimal SVG with only this path
+  // We'll use the current viewBox so the exported file is scaled similarly
+  const gearSVG = document.getElementById('gearSVG');
+  const viewBox = gearSVG.getAttribute('viewBox');
+
+  const minimalSVG = `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">
+  <path d="${d}" fill="none" stroke="black"/>
+</svg>`;
+
+  const blob = new Blob([minimalSVG], {type:"image/svg+xml;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = "cycloidal_gear.svg";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+document.getElementById('generateBtn').addEventListener('click', generateGear);
+document.getElementById('downloadBtn').addEventListener('click', downloadSVG);
+
+// Generate once at load
+generateGear();
+</script>
+</body>
+</html>
